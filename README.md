@@ -1,4 +1,2 @@
-# Mini-BLE-stack
-The project develops a small bluetooth low energy stack based on linux's Bluez libraries. It allows control for python based projects on connection parameters and timing, as well as service discovery and handling.
-
-The intended use case is for any python ble project run on linux based on python that requires precise control over ble connection parameters and hci messages.
+# BLE-stack
+This project implements a lightweight Bluetooth Low Energy (BLE) host library in C on top of Linux's BlueZ interfaces. It provides low-level access to HCI, ATT, and GATT procedures while exposing control over BLE connection parameters that are often abstracted away by high-level libraries. Python bindings are provided so the library can be integrated into control applications, simulations, and other high-level software without sacrificing access to low-level BLE functionality.
