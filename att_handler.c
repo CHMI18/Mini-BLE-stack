@@ -6,7 +6,7 @@
 #include "acl_handler.h"
 #include "att_handler.h"
 
-static att_parsed_response services;
+static att_parsed_response services; 
 static att_parsed_response characteristics;
  
 
@@ -16,16 +16,47 @@ int parse_att_response(att_pdu_response *msg, att_parsed_response *out){ //parse
 
     switch(out->opcode){
         case 0x01: //Error response
+        {
         out->data.error.req_opcode = msg->buffer[1];
         out->data.error.handle = (msg->buffer[3] << 8) | msg->buffer[2];
         out->data.error.error_code = msg->buffer[4];
-        return -1;
+
+        if (out->data.error.error_code == 0x0A){return 1;}
+        else {return -1;}
+        }
+        
+        case 0x05:
+        {
+        if (msg->buffer[1] != 0x01 & msg->buffer[1] != 0x02){ 
+            printf("Error: Unexpected UUID format\n");
+            return -1;
+        }
+
+        uint8_t count = out->data.find_information_resp.count;
+        uint8_t entry_len = (msg->buffer[1] - 1) ? 18 : 4;
+        uint8_t uuid_len = entry_len - 2;
+        uint8_t entry_count = (msg->l2cap_size - 2)/entry_len;
+
+        for (int i = 0; i < entry_count; i++){
+            uint8_t entry_start = 2 + i*entry_len;
+
+            out->data.find_information_resp.descriptor_info[count + i].format = msg->buffer[1];
+            out->data.find_information_resp.descriptor_info[count + i].uuid_len = (msg->buffer[1] - 1) ? 16 : 2;
+            out->data.find_information_resp.descriptor_info[count + i].handle = msg->buffer[entry_start] & 0x00FF|
+                                                                             (msg->buffer[entry_start + 1] << 8) & 0xFF00;
+            for (int k = 0; k < uuid_len; k++){
+                out->data.find_information_resp.descriptor_info[count + i].uuid[k] = msg->buffer[entry_start + 2 + k];
+            }     
+        }
+        out->data.find_information_resp.count += entry_count;
+
+        return 0;
+        }
 
         case 0x09: //Read_by_type response
+        {
         uint8_t count = out->data.read_by_type_resp.count;
         uint8_t start_index = 7;
-
-        
 
         uint8_t service_len = msg->buffer[1];
         uint8_t n_characteristics = (msg->l2cap_size - 2)/service_len;
@@ -48,14 +79,16 @@ int parse_att_response(att_pdu_response *msg, att_parsed_response *out){ //parse
     }
         out->data.read_by_type_resp.count += n_characteristics;
         return 0;
-
+        }
 
         case 0x0B://Standard pdu response message
+        {
         out->data.read_resp.len = msg->l2cap_size - 1;
         for (int i = 0; i < out->data.read_resp.len; i++){
             out->data.read_resp.value[i] = msg->buffer[1 + i];
         }
         return 0;
+        }
 
         case 0x11:
         { // Service description response
@@ -83,6 +116,9 @@ int parse_att_response(att_pdu_response *msg, att_parsed_response *out){ //parse
         }
         return 0;
         }
+
+        case 0x13:
+            return 0;
 
         default:
         printf("Unhandled opcode: 0x%02x\n", out->opcode);
@@ -136,7 +172,19 @@ void att_build_read_by_group_type_req(uint8_t *buf,
     buf[5] = SERVICE_HANDLER_UUID & 0xFF;
     buf[6] = SERVICE_HANDLER_UUID >> 8 & 0xFF;
 }
-void read_characteristic(int att_sock,
+
+void att_build_find_information_req(uint8_t *buf,
+                                    uint16_t start_handle,
+                                    uint16_t end_handle){
+    buf[0] = 0x04;
+    buf[1] = start_handle & 0xFF;
+    buf[2] = start_handle >> 8 & 0xFF;
+    buf[3] = end_handle & 0xFF;
+    buf[4] = end_handle >> 8 & 0xFF;
+
+};
+
+int read_characteristic(int att_sock,
                               uint16_t handle){
     uint8_t req[3];
     uint8_t raw_bytes[256];
@@ -153,7 +201,7 @@ void read_characteristic(int att_sock,
 
     if (r_bytes <= 0) {
         printf("No data received\n");
-        return;
+        return -1;
     }
 
     decode_pdu_msg(raw_bytes, r_bytes, &response);
@@ -163,13 +211,50 @@ void read_characteristic(int att_sock,
         printf("Error response: req_opcode=0x%02x handle=0x%04x error_code=0x%02x\n",
                parsed.data.error.req_opcode, parsed.data.error.handle,
                parsed.data.error.error_code);
+        return -1;
     } else if (err == 0 && parsed.opcode == 0x0B) {
         printf("Read succeeded, value: ");
         for (int i = 0; i < parsed.data.read_resp.len; i++) {
             printf("%02X ", parsed.data.read_resp.value[i]);
         }
         printf("\n");
+        
     }
+    return 0;
+}
+
+int write_characteristic(int att_sock,
+                          uint16_t handle,
+                          uint8_t *data,
+                          uint16_t size){
+    
+    uint8_t req[3 + size];
+    uint8_t raw_bytes[256];
+    att_pdu_response pdu;
+    att_parsed_response out;
+
+    att_build_write_req(handle, data, size, req);
+    send_att_pdu(att_sock, size + 3, req);
+    
+    int r_bytes = read_att_pdu_response(att_sock, sizeof(raw_bytes), raw_bytes);
+
+    if (r_bytes <= 0) {
+        printf("No data received\n");
+        return -1;
+    }
+
+    decode_pdu_msg(raw_bytes, r_bytes, &pdu);
+    int err = parse_att_response(&pdu, &out);
+
+    if (err < 0){
+    printf("ATT Error 0x%02X\n", out.data.error.error_code);
+        return -1;
+    }
+    else {
+        return 0;
+    }
+
+    
 }
 
 int discover_all_characteristics(int att_sock){
@@ -182,9 +267,12 @@ int discover_all_characteristics(int att_sock){
     characteristics.data.read_by_type_resp.count = 0;
 
     for (int i = 0; i < services.data.group_type_resp.count; i++){
+
         uint16_t start_handle = services.data.group_type_resp.services[i].start_handle;
         uint16_t end_handle = services.data.group_type_resp.services[i].end_handle;
 
+        while(1){
+    
         att_build_read_by_type_req(req, start_handle, end_handle);
         send_att_pdu(att_sock, sizeof(req), req);
 
@@ -200,8 +288,12 @@ int discover_all_characteristics(int att_sock){
             printf("Error: Parse att response");
             return -1;
         }
+        else if (err == 1){break;}
 
+        uint8_t discovered = characteristics.data.read_by_type_resp.count;
+        start_handle = characteristics.data.read_by_type_resp.characteristics[discovered - 1].value_handle;
     }
+}
     return 0;
 }
 
@@ -228,12 +320,16 @@ int discover_all_services(int att_sock){
         decode_pdu_msg(raw_bytes, n, &pdu); 
         int err = parse_att_response(&pdu, &resp); //Parse response
 
-        if (err == -1) {
+        if (err == 1) {
             if (resp.data.error.error_code == 0x0A) {
                 printf("Discovery complete: no more services\n");
                 break;
             }
             printf("Unexpected error 0x%02x during discovery\n", resp.data.error.error_code);
+            continue;
+        }
+        else if(err == -1){
+            printf("Error: parse att response\n");
             return -1;
         }
 
