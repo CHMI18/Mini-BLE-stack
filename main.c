@@ -51,6 +51,7 @@ int main(void)
     wait_le_conn_update_complete(hci_sock);
 
     discover_all_services(att_sock);
+
     discover_all_characteristics(att_sock);
 
     get_service_characteristics();
@@ -64,10 +65,12 @@ int main(void)
 
     for (int i = 0; i < 10; i++){
         read_characteristic(att_sock, hand);
-        usleep(50000);
+        usleep(1000000);
     }
-
-    
+    for(int k = 0; k < 10; k++){
+        printf("%d\n", k);
+        usleep(1000000);
+    }
 
     close(att_sock);
     close(hci_sock);
