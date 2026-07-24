@@ -28,6 +28,15 @@ typedef struct __attribute__((packed)){
 
 } gatt_characteristic_entry;
 
+typedef struct __attribute__((packed)){
+    uint8_t format;
+    uint16_t handle;
+    uint8_t uuid_len;
+    uint8_t uuid[128];
+} gatt_find_information;
+
+
+
 typedef struct {
     uint8_t opcode;
     union {
@@ -35,13 +44,12 @@ typedef struct {
         struct { uint8_t value[128]; uint16_t len; } read_resp;
         struct { gatt_service_entry services[128]; uint8_t count; } group_type_resp;
         struct { gatt_characteristic_entry characteristics[128]; uint8_t count; } read_by_type_resp;
+        struct { gatt_find_information descriptor_info[128]; uint8_t count; } find_information_resp;
     } data;
 } att_parsed_response;
 
-
 int parse_att_response(att_pdu_response *msg,
                        att_parsed_response *out);
-
 
 void att_build_read_req(uint8_t *out_buf,
                        uint16_t service_handle);
@@ -51,12 +59,22 @@ void att_build_write_req(uint16_t handle,
                          uint16_t value_len,
                          uint8_t *out_buf);
 
-void read_characteristic(int att_sock,
-                              uint16_t handle);
-
 void att_build_read_by_group_type_req(uint8_t *buf,
                                       uint16_t start_handle,
                                       uint16_t end_handle);
+
+void att_build_find_information_req(uint8_t *buf,
+                                    uint16_t start_handle,
+                                    uint16_t end_handle);
+
+int read_characteristic(int att_sock,
+                         uint16_t handle);
+
+int write_characteristic(int att_sock,
+                         uint16_t handle,
+                         uint8_t *data,
+                         uint16_t size);
+
 
 int discover_all_services(int att_sock);
 
