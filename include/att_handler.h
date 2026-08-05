@@ -17,6 +17,7 @@ typedef struct __attribute__((packed)){
     uint16_t end_handle;
     uint8_t uuid[128];
     uint8_t uuid_len;
+    uint8_t n_characteristics;
 } gatt_service_entry;
 
 typedef struct __attribute__((packed)){
@@ -33,7 +34,7 @@ typedef struct __attribute__((packed)){
     uint16_t handle;
     uint8_t uuid_len;
     uint8_t uuid[128];
-} gatt_find_information;
+} gatt_information_entry;
 
 
 
@@ -44,7 +45,7 @@ typedef struct {
         struct { uint8_t value[128]; uint16_t len; } read_resp;
         struct { gatt_service_entry services[128]; uint8_t count; } group_type_resp;
         struct { gatt_characteristic_entry characteristics[128]; uint8_t count; } read_by_type_resp;
-        struct { gatt_find_information descriptor_info[128]; uint8_t count; } find_information_resp;
+        struct { gatt_information_entry descriptor_info[128]; uint8_t count; } find_information_resp;
     } data;
 } att_parsed_response;
 
@@ -86,5 +87,9 @@ void att_build_read_by_type_req(uint8_t *buf,
 
 int discover_all_characteristics(int att_sock);
 
-void get_service_characteristics(void);
+static const char *uuid16_to_string(uint16_t uuid);
+
+static void print_properties(uint8_t properties);
+
+void get_characteristics(void);
 #endif

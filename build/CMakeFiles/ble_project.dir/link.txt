@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/ble_project.dir/src/main.c.o CMakeFiles/ble_project.dir/src/hci_handler.c.o CMakeFiles/ble_project.dir/src/att_handler.c.o CMakeFiles/ble_project.dir/src/acl_handler.c.o -o ble_project  -lbluetooth 

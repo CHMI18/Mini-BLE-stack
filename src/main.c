@@ -54,7 +54,8 @@ int main(void)
 
     discover_all_characteristics(att_sock);
 
-    get_service_characteristics();
+    get_characteristics();
+
 
     int service_handle;
 
@@ -65,11 +66,7 @@ int main(void)
 
     for (int i = 0; i < 10; i++){
         read_characteristic(att_sock, hand);
-        usleep(1000000);
-    }
-    for(int k = 0; k < 10; k++){
-        printf("%d\n", k);
-        usleep(1000000);
+        usleep(50000);
     }
 
     close(att_sock);
