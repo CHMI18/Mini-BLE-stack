@@ -37,5 +37,4 @@ int wait_le_conn_update_complete(int sock);
 
 int get_hci_version(int socket, uint8_t* buffer, int size);
 
-
 #endif
